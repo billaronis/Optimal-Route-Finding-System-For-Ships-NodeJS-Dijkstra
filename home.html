@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Optimal route finding system for ships</title>
+<meta charset="utf-8" />
+<link rel="stylesheet" crossorigin=""
+	href="https://unpkg.com/leaflet@1.0.3/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.0.3/dist/leaflet-src.js"
+	crossorigin=""></script>
+
+<link rel="icon" href="favicon.ico">
+
+
+
+<style>
+body {
+	padding: 0;
+	margin: 0;
+}
+
+html, body, #map {
+	height: 90%;
+	width: 100%;
+}
+</style>
+</head>
+<body>
+	<div id="map">
+
+		<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+			integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+			crossorigin=""></script>
+		</script>
+		<script>
+   		var mymap = L.map('map').setView([37.629382, 25.716784], 7);
+        mapLink = 
+            '<a href="http://openstreetmap.org">OpenStreetMap</a>';
+            L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+  			  attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+  			}).addTo(mymap);
+        function searchStartPort() {
+            var xhr = new XMLHttpRequest();
+            var searchInput = document.getElementById("myInput").value;
+            xhr.open("GET", 'http://localhost:3000/api/ports/' + searchInput, true);
+            xhr.send();
+            xhr.onload = function () {
+                if (this.status == 200) {
+                    var ports = JSON.parse(this.responseText);
+                    var coordinates = [];
+                    for (var i = 1; i < ports.length; i++) {
+                        document.getElementById("StartportValue" + i).value = ports[i].properties.country + ',' + ports[i].properties.portname;
+                    }
+                }
+            };
+        }
+        function searchEndPort() {
+            var xhr = new XMLHttpRequest();
+            var searchInput = document.getElementById("myInputB").value;
+            xhr.open("GET", 'http://localhost:3000/api/ports/' + searchInput, true);
+            xhr.send();
+            xhr.onload = function () {
+                if (this.status == 200) {
+                    var ports = JSON.parse(this.responseText);
+                    var coordinates = [];
+                    for (var i = 1; i < ports.length; i++) {
+                        document.getElementById("EndportValue" + i).value = ports[i].properties.country + ',' + ports[i].properties.portname;
+                        coordinates = ports[i].geometry.coordinates;
+                    }
+                }
+            };
+        }
+		//pins for the ports
+        var startMarker = {};
+        var startPort;
+        
+        //markers for closest polygons
+        var dot = {};
+        var dot2 = {};
+        
+        //coords of the start and end port
+        var Scoordinates = [];
+        var Ecoordinates = [];
+        
+        var crd;
+        var x;
+        var y;
+        var endPort;
+        var endMarker = {};
+        var newdist;
+        
+        var closestPoint;
+        var closestStartPointName;
+        
+        var connectStart;
+        var connectEnd;
+        
+        var closestEndPoint;
+        var closestEndPointName;
+        
+        var Sreal_coord = [];
+        var Ereal_coord = [];
+        var newEnddist;
+        
+        //result path
+        var result;
+        
+        //polyline
+        var firstpolyline = {};
+        
+        
+        function putStartPin() {
+            mymap.removeLayer(startMarker);
+            mymap.removeLayer(dot);
+            mymap.removeLayer(firstpolyline);
+            newdist = 100000;
+            var value;
+            value = document.getElementById("myInput").value;
+            startPort = value.split(',')[1];
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", 'http://localhost:3000/api/ports/' + startPort, true);
+            xhr.send();
+            xhr.onload = function () {
+                if (this.status == 200) {
+                    var ports = JSON.parse(this.responseText);  
+                    //console.log(ports[0].geometry.coordinates);
+                    if (ports.length > 0) {
+                                Scoordinates = ports[0].geometry.coordinates;
+                                //console.log(Scoordinates);
+                                crd = Scoordinates[0].split(',');
+                                x = crd[0].replace("[","");
+                                y = crd[1].replace("]","");
+                                //console.log(Number(x));
+                                //console.log(Number(y));
+                                if (startMarker != 'undefined') {
+                                    mymap.removeLayer(startMarker);
+                                }                                
+                                startMarker = L.marker([Number(y),Number(x)]).addTo(mymap);
+                                mymap.setView([y,x],6);
+                                //console.log("Port: "+y+","+x);
+                                var xhr2 = new XMLHttpRequest();
+                                xhr2.open("GET", 'http://localhost:3000/api/phaseTwoGet', true);
+                                xhr2.send();
+                                xhr2.onload = function () {
+                                	if (this.status == 200) {
+                                		var polygons = JSON.parse(this.responseText)
+                                		//all points from edges (polygons)
+                                		//console.log(polygons);
+                                		var allPoints = []
+                                		for (j = 0; j < polygons.length; j++) {
+                                			allPoints.push([Number(polygons[j].Edge[0][1]),Number(polygons[j].Edge[0][0])]);
+                                			allPoints.push([Number(polygons[j].Edge[1][1]),Number(polygons[j].Edge[1][0])]);                                			
+                                		}
+                                		//console.log(allPoints);
+                                		for (i = 0; i < allPoints.length; i++) {
+                                			var distance = findDistance(Number(y), Number(x), allPoints[i][0], allPoints[i][1], "N")
+                                    		//console.log(distance);
+                                            if (distance < 162 && distance < newdist) {
+                                                newdist = distance;
+                                                closestPoint = [allPoints[i][0], allPoints[i][1]];
+                                            }		                               			
+                                		}
+                                		
+                                		//console.log(closestPoint);
+                                		//console.log(closestStartPointName);
+                                		Sreal_coord = [Number(y),Number(x)];
+                                		console.log("Start Port: "+Sreal_coord);
+                                		console.log("Closest Start Point: "+closestPoint);
+                                		dot = L.circleMarker(closestPoint).addTo(mymap);
+                                		document.getElementById("myInputB").disabled = false;
+                                		//console.log("Closest polygon start point: "+closestPoint);
+                                		//console.log("Start id polygon:" + closestPointName);
+                                		connectStart = [(Sreal_coord), (closestPoint)];                                		
+                                		//console.log(connectStart);
+                                	}	
+                                };
+                                
+                     }         
+                }
+            };
+        }
+        
+        function putEndPin() {
+            mymap.removeLayer(endMarker);
+            mymap.removeLayer(dot2);
+            mymap.removeLayer(firstpolyline);
+            newEnddist = 100000;
+            var value;
+            value = document.getElementById("myInputB").value;
+            endPort = value.split(',')[1];
+            var xhrend = new XMLHttpRequest();
+            xhrend.open("GET", 'http://localhost:3000/api/ports/' + endPort, true);
+            xhrend.send();
+            xhrend.onload = function () {
+                if (this.status == 200) {
+                    var ports = JSON.parse(this.responseText);
+                            if (ports.length > 0) {
+                            	Ecoordinates = ports[0].geometry.coordinates;
+                                //console.log(Ecoordinates);
+                                crd = Ecoordinates[0].split(',');
+                                x = crd[0].replace("[","");
+                                y = crd[1].replace("]","");
+                                //console.log(Number(x));
+                                //console.log(Number(y));
+                                if (endMarker != 'undefined') {
+                                    mymap.removeLayer(endMarker);
+                                }   
+                                
+                                endMarker = L.marker([Number(y),Number(x)]).addTo(mymap);
+                                var group = new L.featureGroup([startMarker, endMarker]);
+                                mymap.fitBounds(group.getBounds());
+                                
+                                var xhr2 = new XMLHttpRequest();
+                                xhr2.open("GET", 'http://localhost:3000/api/phaseTwoGet', true);
+                                xhr2.send();
+                                xhr2.onload = function () {
+                                	if (this.status == 200) {
+                                		var polygons = JSON.parse(this.responseText);
+                                		
+										var allPoints = [];
+                                		for (j = 0; j < polygons.length; j++) {
+                                			allPoints.push([Number(polygons[j].Edge[0][1]),Number(polygons[j].Edge[0][0])]);
+                                			allPoints.push([Number(polygons[j].Edge[1][1]),Number(polygons[j].Edge[1][0])]);                                			
+                                		}
+                                		//console.log(allPoints);
+
+                                		for (i = 0; i < allPoints.length; i++) {
+                                			var distance = findDistance(Number(y), Number(x), allPoints[i][0], allPoints[i][1], "N")
+                                    		//console.log(distance);
+                                            if (distance < 162 && distance < newEnddist) {
+                                                newEnddist = distance;
+                                                closestEndPoint = [allPoints[i][0], allPoints[i][1]];
+                                            }		                               			
+                                		}
+                                		
+                                		
+                                		Ereal_coord = [Number(y),Number(x)];
+                                		console.log("End Port: "+Ereal_coord);
+                                		console.log("Closest End Point: "+closestEndPoint);
+                                		dot2 = L.circleMarker(closestEndPoint).addTo(mymap);
+                                		//console.log("Closest centroid end point: "+closestEndPoint);
+                                		connectEnd = [(Ereal_coord), (closestEndPoint)]; 
+                                		
+                                }
+                                
+                			};
+            	}
+      		 }
+        };
+     } 
+        
+      //pre-process
+      function phaseOne(){
+    	  var xhr = new XMLHttpRequest();
+          xhr.open("GET", 'http://localhost:3000/api/phaseOne', true);
+          xhr.send();
+          xhr.onload = function () {
+        	  //get polygons dataset
+        	  var tankerPolygons = JSON.parse(this.responseText);
+        	  //console.log(tankerPolygons);
+        	  var centroids = [];
+        	  var correctCoords = [];
+        	  for (var i = 0; i < tankerPolygons.length; i++) {
+        		//find centroid
+        		stringPolygon = tankerPolygons[i].Coordinates;
+              	//console.log(stringPolygon);
+              	stringPolygon = stringPolygon.replace("POLYGON ((","");
+              	stringPolygon = stringPolygon.replace("))","");
+              	//console.log(stringPolygon);
+              	var coords = stringPolygon.split(',');
+              	//console.log(coords);
+              	var totalX = 0;
+              	var totalY = 0;
+              	var res;
+              	//the first coord does't have space in front of it, rest have
+              	res = coords[0].split(" ");
+              	totalX = totalX + Number(res[0]);
+          		totalY = totalY + Number(res[1]);
+          		//console.log("X: " + res[0]);
+          		//console.log("Y: " + res[1]);
+          		
+          		var points = [];
+          		points.push([totalX.toString(),totalY.toString()]);
+              	for (j = 1; j < coords.length; j++) {
+              		res = coords[j].split(" ");
+              		points.push([res[1],res[2]]);
+              		
+              		//console.log("X: " + res[1]);
+              		//console.log("Y: " + res[2]);
+              		totalX = totalX + Number(res[1]);
+              		totalY = totalY + Number(res[2]);
+              	}
+              	correctCoords.push(points);
+              	//console.log("Total X:" + totalX);
+              	//console.log("Total Y:" + totalY);
+              	//lat - lon - thats why Y first X second
+              	//var centroid = [(totalY/coords.length),(totalX/coords.length)];
+              	var centroid = [(Number(totalY/coords.length).toFixed(1).toString()+"0"),(Number(totalX/coords.length).toFixed(1).toString()+"0")];
+              	//console.log("Centroid: "+centroid);
+              	//var xCentroid= Number(centroid[1]).toFixed(1).toString()+"0";
+              	//var yCentroid= Number(centroid[0]).toFixed(1).toString()+"0";
+        		centroids.push(centroid);  
+        	  }
+        	  //console.log(centroids);
+        	  
+        	  //get edge with start end from every polygon
+        	  //var allpoints = [];
+        	  var polyEdges = [];
+        	  for(var k = 0; k< correctCoords.length; k++){
+        		  var allpoints = correctCoords[k];
+        		  var dots = [];
+        		  var results = [];
+        		  var onlyBearing = [];
+        		  for(var v = 0; v< allpoints.length; v++){
+        			  dots.push(allpoints[v]);	  
+        		  }
+        		  //all combinations
+        		  for (let i = 0; i < dots.length - 1; i++) {
+        			  for (let j = i + 1; j < dots.length; j++) {
+        				
+        				if( dots[i][0]!==dots[j][0] && dots[i][1]!==dots[j][1] ){  
+        					//mistakenly made edges->x,y and centroids y,x 
+	        			    results.push([[dots[i][0],dots[i][1]], [dots[j][0],dots[j][1]] , bearing(Number(dots[i][0]),Number(dots[i][1]),Number(dots[j][0]),Number(dots[j][1])) ]);
+	        			    onlyBearing.push( bearing(Number(dots[i][0]),Number(dots[i][1]),Number(dots[j][0]),Number(dots[j][1])) );
+        				}
+        				
+        			  }
+        		  }
+        		  //console.log(results);
+        		  var goal = tankerPolygons[k].MEAN_HEADING;
+        		  if (onlyBearing.length > 1) {
+
+	        		  var closest = onlyBearing.reduce(function(prev, curr) {
+	        			  return (Math.abs(curr - goal) < Math.abs(prev - goal) ? curr : prev);
+	        			});
+	        		  //console.log("Goal: "+goal+" - Closest: "+closest);
+					  var index =  onlyBearing.indexOf(closest);
+					  //console.log("Found edge: "+results[index]);
+					  polyEdges.push(results[index]);
+        		  }  	  
+        	  }
+        	  //console.log(polyEdges);
+        	  
+        	  // get all weather data and complete data together
+        	   var xhr2 = new XMLHttpRequest();
+	           xhr2.open("GET", 'http://localhost:3000/api/weatherData', true);
+	           xhr2.send();
+	           xhr2.onload = function () {
+	        	   
+	        	  var weather =  JSON.parse(this.responseText);
+				  //console.log(weather);
+				  //console.log(centroids);
+	        	 //weather data match - for every centroid, find weather data
+	        	 
+	         	  for (var j = 0; j < polyEdges.length; j++) {
+	         		var dataWeather = [];
+	         		//var centroidsWeather = [];
+	         		for(var k = 0; k< weather.length; k++){
+	         			
+	         			if(centroids[j][0]==weather[k].LATITUDE && centroids[j][1]==weather[k].LONGITUDE ){
+	         				dataWeather.push([weather[k].DATE,weather[k].WIND_DIR,weather[k].WIND_SPEED]);
+	         				//centroidsWeather.push([[centroids[j][0],centroids[j][1]],weather[k].WIND_DIR,weather[k].WIND_SPEED,tankerPolygons[j].Coordinates,tankerPolygons[j].Avg_speed,tankerPolygons[j].MEAN_HEADING]);	
+	         			}		         		
+	         		}
+     				//centroidsWeather.push([polyEdges[j],[centroids[j][0],centroids[j][1]],dataWeather,correctCoords[j],tankerPolygons[j].Avg_speed,tankerPolygons[j].MEAN_HEADING]);	
+     				//post to database
+  	         	  	//var json = JSON.stringify(centroidsWeather);
+  	         	    var jsonEdge = JSON.stringify(polyEdges[j]);
+  	         	    //var jsonCoordinates = JSON.stringify(correctCoords[j]);
+  	         	    //var jsonCentroid = JSON.stringify([centroids[j][0],centroids[j][1]]);
+  	         	    var jsonWeather = JSON.stringify(dataWeather);
+  	         	    
+     				//find same points for weather data "_id":"'+ id +'",
+                    var text = '{"Edge" : ' + jsonEdge + ' ,"Weather" : ' + jsonWeather + ', "Avg_speed" : ' + tankerPolygons[j].Avg_speed + ', "MEAN_HEADING" : "' + tankerPolygons[j].MEAN_HEADING + '" }';
+			
+                    var xhr3 = new XMLHttpRequest();
+  			        xhr3.open("POST", 'http://localhost:3000/api/phaseTwoAdd', true);
+  			        xhr3.setRequestHeader("Content-Type", "application/json");
+  			        //console.log("Sent to server: "+text);
+  			        xhr3.send(text);	  
+  	         	  
+	         	  
+	         	  }
+	         	  //console.log(centroidsWeather);
+	         	  
+	         	  
+	         	  
+	           }; 
+	           
+          };  	  
+      }
+      // 0 is start
+      // 1 is end
+      //centroids are y,x and edges are x,y :(
+      
+    			  
+    		  
+    		  
+      function phaseTwo(){
+    	  console.log("Start port coords:" + Sreal_coord);
+    	  console.log("End port coords:" + Ereal_coord);
+		  console.log("Closest polygon start point: " + closestPoint);
+		  console.log("Closest polygon end point: " + closestEndPoint);
+    	  
+		  /*
+		  //load the results to json data, takes around 7-9minutes for aegean graph with 3nautic miles or less neighbours
+		  var newdist = 1000000;
+    	  var xhr = new XMLHttpRequest();
+          xhr.open("GET", 'http://localhost:3000/api/phaseTwoGet', true);
+          xhr.send();
+          xhr.onload = function () {
+        	 var polygons = JSON.parse(this.responseText); 
+		     var aegean = [];
+        	 //19.248047,34.849875,29.025879,41.195190 bbox of greece
+        	 for (var i = 0; i < polygons.length; i++) {
+        		 //console.log([Number(polygons[i].Centroid[1]),Number(polygons[i].Centroid[0])]);
+        		 //console.log("..");
+	        	 if(  (19.248047 <= Number(polygons[i].Edge[0][0]) && Number(polygons[i].Edge[0][0]) <= 29.025879 && 41.195190 >= Number(polygons[i].Edge[0][1]) && Number(polygons[i].Edge[0][1]) >= 34.849875)
+	        			 && (19.248047 <= Number(polygons[i].Edge[1][0]) && Number(polygons[i].Edge[1][0]) <= 29.025879 && 41.195190 >= Number(polygons[i].Edge[1][1]) && Number(polygons[i].Edge[1][1]) >= 34.849875) ){
+	    			// Point is in bounding box
+	    			//console.log("in");
+	    			aegean.push(polygons[i]);
+	    			//var dot = L.circleMarker([Number(polygons[i].Edge[0][1]),Number(polygons[i].Edge[0][0])]).addTo(mymap);
+	    			//var dot2 = L.circleMarker([Number(polygons[i].Edge[1][1]),Number(polygons[i].Edge[1][0])]).addTo(mymap);
+				 }
+        	 }	 
+        	 //console.log(aegean);
+        	 
+        	 var g = new Graph();
+        	 
+             for (var i = 0; i < aegean.length; i++) {
+            	var test = Math.round(aegean[i].Avg_speed * 10) / 10;
+               	g.addVertex(aegean[i].Edge[0][0]+", "+aegean[i].Edge[0][1]);
+               	g.addVertex(aegean[i].Edge[1][0]+", "+aegean[i].Edge[1][1]+ " " + test);
+               	var startx = Number(aegean[i].Edge[0][0]);
+				var starty = Number(aegean[i].Edge[0][1]);
+                var endx = Number(aegean[i].Edge[1][0]);
+                var endy = Number(aegean[i].Edge[1][1]);
+                
+
+                //console.log(test);
+               	g.addEdge(aegean[i].Edge[0][0] + ", "+aegean[i].Edge[0][1],aegean[i].Edge[1][0]+", "+aegean[i].Edge[1][1] + " " + test,findDistance(starty, startx, endy, endx, "N"));
+             }
+
+             
+             
+             //connect nearest edges
+             for (var i = 0; i < aegean.length; i++) {
+            	 			//for edges x->0 y->1
+							//take the end of the edge of each (polygon)
+                            var endx = Number(aegean[i].Edge[1][0]);
+                            var endy = Number(aegean[i].Edge[1][1]);
+                            //var distanceArray = [];
+                            var closeStartX;
+                            var closeStartY;
+                            var distance;
+                            //var distance = findDistance(startx, starty, endx, endy, "N")
+                            for (var j = 0; j < aegean.length; j++) {
+                            	
+                            	//another end of another edge
+                            	closeStartX = Number(aegean[j].Edge[0][0]);
+                                closeStartY = Number(aegean[j].Edge[0][1]);
+                                
+                                //var newstartx = Number(polygons[j].Edge[0][0]);
+                                //var newstarty = Number(polygons[j].Edge[0][1]);
+                                
+                            	if( i!=j ){
+                            		distance = findDistance(endy, endx, closeStartY, closeStartX, "N");
+                            		
+                            		//HERE add extra check for wind
+                            		
+                            		//to prwto miden edw tha ginetai oti exei pei gia date o xristis
+                            		//if(typeof aegean[i].Weather[0] !== 'undefined' && typeof aegean[j].Weather[0] !== 'undefined' ){	
+	                            		if (distance < 3) {
+	                                        //newdist = distance;
+	                                        //closestStartOfEdge = [closeStartY, closeStartX];
+	                                        //newEnd = [Number(polygons[j].Edge[1][1], Number(polygons[j].Edge[1][0]];
+	                                        var test = Math.round(aegean[i].Avg_speed * 10) / 10;
+	                                        g.addEdge(aegean[i].Edge[1][0] + ", "+aegean[i].Edge[1][1] + " " + test, aegean[j].Edge[0][0] + ", "+aegean[j].Edge[0][1],distance);
+	                                        console.log("new edge");
+	                                    }
+                            		//}	
+                            	}   	
+                            }
+                            
+                            //found closest end point of another edge so connect! end with start
+             }
+             //var display = JSON.stringify(g);
+             //console.log(JSON.parse(display));
+  			  //save graph to memory 
+  			 
+  			  export2txt(g);
+             //x,y - lng,lat
+             // && (Math.abs(Number(aegean[j].Weather[0][1])-aegean[j].MEAN_HEADING) < 180) mesa sto iff distance < 3
+             //( ((aegean[j].Weather[0][1]<=360 && aegean[j].Weather[0][1] >= 270) && (aegean[j].MEAN_HEADING<=360 && aegean[j].MEAN_HEADING >= 270)) || ((aegean[j].Weather[0][1]<=269.9 && aegean[j].Weather[0][1] >= 180) && (aegean[j].MEAN_HEADING<=269.9 && aegean[j].Weather[0][1] >= 180)) || ((aegean[i].Weather[0][1]<=179.9 && aegean[i].Weather[0][1] >= 90) && (aegean[j].Weather[0][1]<=179.9 && aegean[j].Weather[0][1] >= 90)) || ((aegean[i].Weather[0][1]<=89.9 && aegean[i].Weather[0][1] >= 0) && (aegean[j].Weather[0][1]<=89.9 && aegean[j].Weather[0][1] >= 0)) )
+             */
+             
+             //start finish for dijkstra
+             var start = closestPoint[1]+", "+closestPoint[0];
+             var finish = closestEndPoint[1]+", "+closestEndPoint[0];
+             
+             //loads the graph from json file to buy time
+             var xhr5 = new XMLHttpRequest();
+	           xhr5.open("GET", 'http://localhost:3000/api/loadGraph', true);
+	           xhr5.send();
+	           xhr5.onload = function () {
+	        	   var data =  JSON.parse(this.responseText);	        	 
+				   //console.log(data);
+				   
+				   //var word = "22.19529, 36.310558";
+				   //console.log(data.adjacencyList[word]);
+				   
+				   var g = new Graph();
+				   for (var key in data.adjacencyList){
+					   g.addVertex(key);
+					   var values = data.adjacencyList[key];
+					   for (var key2 in values){
+						   //console.log("Key2: " + key2);
+						   //console.log("value: "+ values[key2]);
+						   g.addVertex(key2);
+						   g.addEdge(key,key2,values[key2]);
+					   }					   
+				   }
+				   //console.log(g);
+				   
+	        	   result = g.Dijkstra(start,finish);
+	        	   console.log(result);
+	        	   line(result);
+	        	   document.getElementById("myInputB").disabled = true;
+	        	   document.getElementById("myInputB").value = '';
+	        	   document.getElementById("myInput").value = '';
+	        	   
+	        	   //var distance = totalDistance(result);
+	        	   
+	        	   //calculate distance/time/speed
+	        	   //document.getElementById("Distance").innerHTML = distance;
+	        	   //document.getElementById("Time").innerHTML = "6h";
+	        	   //document.getElementById("Speed").innerHTML = "Calculating...";
+	           };
+  	  		  
+         //};
+          
+          
+          
+      } 
+      
+      function totalDistance(result){
+    	  
+    	  var total = 0;
+    	  for(var i = 0; i <result.length-1; i++){
+    		  
+    		  var split1 = result[i].split(", ");
+    		  var split2 = result[i+1].split(", ");
+    		  //console.log("lon1: " + split1[0]);
+    		  //console.log("lat1: " + split1[1]);
+    		  //console.log("lon2: " + split2[0]);
+    		  //console.log("lat2: " + split2[1]);
+    		  var lat1 = split1[1];
+    		  var lon1 = split1[0];
+    		  var lat2 = split2[1];
+    		  var lon2 = split2[0];
+    		  total = total + findDistance(lat1,lon1,lat2,lon2,"N");    		  
+    	  }
+    	  //adds the distances from ports to closest polygons (for start and end port)
+    	  total = total + findDistance(Sreal_coord[0],Sreal_coord[1],closestPoint[0],closestPoint[1],"N");
+    	  total = total + findDistance(Ereal_coord[0],Ereal_coord[1],closestEndPoint[0],closestEndPoint[1],"N");
+    	  return total;
+    	  
+      }
+      
+     
+      
+      function export2txt(data) {
+    	  const originalData = data;
+    	    
+		  console.log("in!");
+    	  const a = document.createElement("a");
+    	  a.href = URL.createObjectURL(new Blob([JSON.stringify(originalData, null, 2)], {
+    	    type: "application/json"
+    	  }));
+    	  a.setAttribute("download", "data.json");
+    	  document.body.appendChild(a);
+    	  a.click();
+    	  document.body.removeChild(a);
+    	} 
+
+    	
+    	
+      //check path display
+      function line(thepath){
+    	  	
+    	  var path = thepath;
+    		
+    	  var pointList = [];
+    	  for (var i = 0; i < path.length; i++) {
+    		  var temp = path[i].split(', ');
+    		  //console.log("x: "+temp[0]);
+    		  //console.log("Y: "+temp[1]);
+    		  
+             	var point = new L.LatLng(Number(temp[1]), Number(temp[0]));
+				pointList.push(point);  	
+    	  }
+    	  firstpolyline = new L.Polyline(pointList, {
+       	    color: 'red',
+       	    weight: 3,
+       	    opacity: 0.5,
+       	    smoothFactor: 1
+       	});
+       	firstpolyline.addTo(mymap);	  
+      }
+      
+   // Converts from degrees to radians.
+      function toRadians(degrees) {
+        return degrees * Math.PI / 180;
+      };
+       
+      // Converts from radians to degrees.
+      function toDegrees(radians) {
+        return radians * 180 / Math.PI;
+      }
+
+
+      function bearing(startLat, startLng, destLat, destLng){
+        startLat = toRadians(startLat);
+        startLng = toRadians(startLng);
+        destLat = toRadians(destLat);
+        destLng = toRadians(destLng);
+
+        y = Math.sin(destLng - startLng) * Math.cos(destLat);
+        x = Math.cos(startLat) * Math.sin(destLat) -
+              Math.sin(startLat) * Math.cos(destLat) * Math.cos(destLng - startLng);
+        brng = Math.atan2(y, x);
+        brng = toDegrees(brng);
+        return (brng + 360) % 360;
+      }
+      
+        
+       class Graph { 
+    	    constructor() {
+    	        this.adjacencyList = {};
+    	        
+    	    }
+    	    addVertex(name) {
+    	    	 if (!this.adjacencyList[name]) {
+    	             this.adjacencyList[name] = {};
+    	         }
+    	    }
+    	    addEdge(vert1, vert2, weight) {
+    	    	this.adjacencyList[vert1][vert2] = weight;
+    	    }
+    	    removeEdge(v1,v2) {
+    	        delete this.adjacencyList[v1][v2];
+    	        delete this.adjacencyList[v2][v1];
+    	    }
+    	    Dijkstra(start, finish) {
+    	    	 // List1
+    	        const costFromStartTo = {};
+    	        // List2
+    	        const checkList = new PriorityQueue();
+    	        // List3
+    	        const prev = {};
+
+    	        let current;
+    	        let result = [];
+    	        let speeds = [];
+    	        for (let vert in this.adjacencyList) {
+    	        	if (vert === start) {
+    	                costFromStartTo[vert] = 0;
+    	                checkList.enqueue(vert, 0);
+    	            } else {
+    	                costFromStartTo[vert] = Infinity;
+    	            }
+    	            prev[vert] = null
+    	        }
+    	        while (checkList.values.length) {
+    	        	 current = checkList.dequeue().val;
+    	        	 
+    	        	 if (current === finish) {
+    	        		 while (prev[current]) {
+    	                     result.push(current);
+    	                     //var fix = this.adjacencyList[current][prev[current]].split(" ");
+    	                     //console.log("current: "+current);
+    	                     //console.log("prev curr: "+prev[current]);
+    	                     //console.log(this.adjacencyList[prev[current]][current]);
+    	                     var fix = this.adjacencyList[prev[current]][current].split(" ");
+    	                     speeds.push(fix[1]);
+    	                     
+    	                     current = prev[current];
+    	                 }
+    	                 break;	 
+    	        	 }else{
+	    	             for (let neighbor in this.adjacencyList[current]) {
+	    	            	 //console.log(this.adjacencyList[current][neighbor]);
+	    	            	 var fix = this.adjacencyList[current][neighbor].split(" ");
+	    	            	 //console.log(Number(fix[0]));
+	    	            	 let costToNeighbor = costFromStartTo[current] + Number(fix[0]);
+	    	                 if (costToNeighbor < costFromStartTo[neighbor]) {
+	    	                     costFromStartTo[neighbor] = costToNeighbor;
+	    	                     prev[neighbor] = current;
+	    	                     checkList.enqueue(neighbor, costToNeighbor);
+	    	                     
+	    	             	  }	
+	    	             } 
+    	        	 }
+    	        }
+    	        console.log(speeds);
+    	        var sum = 0
+    	        for (var i = 0; i < speeds.length; i++) {
+    	        	sum = sum + Number(speeds[i]);
+    	        }
+    	        var total = sum/speeds.length;
+    	        document.getElementById("Speed").innerHTML = total + " Nm/h";
+    	        
+    	        var distance = totalDistance(result);
+	        	
+	        	document.getElementById("Distance").innerHTML = distance + " Nm";
+
+	        	var decimalTime = Number(distance)/Number(total);
+	        	decimalTime = decimalTime * 60 * 60;
+	        	var hours = Math.floor((decimalTime / (60 * 60)));
+	        	decimalTime = decimalTime - (hours * 60 * 60);
+	        	var minutes = Math.floor((decimalTime / 60));
+	        	decimalTime = decimalTime - (minutes * 60);
+	        	var seconds = Math.round(decimalTime);
+	        	if(hours < 10)
+	        	{
+	        		hours = "0" + hours;
+	        	}
+	        	if(minutes < 10)
+	        	{
+	        		minutes = "0" + minutes;
+	        	}
+	        	if(seconds < 10)
+	        	{
+	        		seconds = "0" + seconds;
+	        	}
+    	        document.getElementById("Time").innerHTML = "" + hours + ":" + minutes + ":" + seconds;
+    	        
+    	        return result.concat(current).reverse();
+    	    }
+    	} 
+       
+       class PriorityQueue {
+    	    constructor(){
+    	        this.values = [];
+    	    }
+    	    enqueue(val, priority) {
+    	        this.values.push({val, priority});
+    	        this.sort();
+    	    };
+    	    dequeue() {
+    	        return this.values.shift();
+    	    };
+    	    sort() {
+    	        this.values.sort((a, b) => a.priority - b.priority);
+    	    };
+    	}
+
+      
+      
+        function findDistance(lat1, lon1, lat2, lon2, unit) {
+            if ((lat1 == lat2) && (lon1 == lon2)) {
+                return 0;
+            }
+            else {
+                var radlat1 = Math.PI * lat1 / 180;
+                var radlat2 = Math.PI * lat2 / 180;
+                var theta = lon1 - lon2;
+                var radtheta = Math.PI * theta / 180;
+                var dist = Math.sin(radlat1) * Math.sin(radlat2) + Math.cos(radlat1) * Math.cos(radlat2) * Math.cos(radtheta);
+                if (dist > 1) {
+                    dist = 1;
+                }
+                dist = Math.acos(dist);
+                dist = dist * 180 / Math.PI;
+                dist = dist * 60 * 1.1515;
+                if (unit == "K") { dist = dist * 1.609344 }
+                if (unit == "N") { dist = dist * 0.8684 }
+                return dist;
+            }
+        }
+        
+
+    </script>
+	</div>
+	<div class="info">
+		<div id="Title">Optimal route finding system for ships</div>
+		<div class="sub-heading">
+			<div id="Title2">Please choose 2 ports to calculate best route.</div>
+		</div>
+	</div>
+	<div class="portA">
+		<input id="myInput" type="text" list="portList" name="start"
+			onkeyup="searchStartPort()" oninput="putStartPin()"
+			placeholder="Start Port" tabindex="1" autocomplete="off"
+			class="auto-style1" />
+		<datalist id="portList">
+			<option id="StartportValue1" value="" />
+			<option id="StartportValue2" value="" />
+			<option id="StartportValue3" value="" />
+			<option id="StartportValue4" value="" />
+		</datalist>
+	</div>
+	<div class="portB">
+		<input id="myInputB" type="text" list="portList2" name="end"
+			onkeyup="searchEndPort()" oninput="putEndPin()" disabled="disabled"
+			placeholder="Destination Port" tabindex="2" autocomplete="off" 
+			class="auto-style1" />
+		<datalist id="portList2">
+			<option id="EndportValue1" value="" />
+			<option id="EndportValue2" value="" />
+			<option id="EndportValue3" value="" />
+			<option id="EndportValue4" value="" />
+		</datalist>
+	</div>
+	<button type="button" class="myButton" id="calculate"
+		onclick="phaseTwo()">Calculate</button>
+	<!-- <button onclick="export2txt()">Export data to local txt file</button>	 -->
+	
+	<div class="Results" style="position:absolute; float:right;">
+		<div id="ResultTitle"><u>Results: </u></div>
+		<div class="dist">
+			<label>Total distance:</label>
+			<label id="Distance">Empty</label>
+		</div>
+		<div class="speed">
+			<label>Average Speed:</label>
+			<label id="Speed">Empty</label>
+		</div>
+		<div class="time">
+			<label>Total trip time:</label>
+			<label id="Time">Empty</label>
+		</div>	
+	</div>
+	
+
+</body>
+</html>
