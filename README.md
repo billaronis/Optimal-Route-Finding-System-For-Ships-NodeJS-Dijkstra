@@ -11,9 +11,9 @@ Leaflet
 MongoDB
 NodeJS - Express
 
-npm install nodejs
-npm install express
-npm install mongoose
+npm install nodejs  
+npm install express  
+npm install mongoose  
 npm install serve-favicon
 
 ### Tools
