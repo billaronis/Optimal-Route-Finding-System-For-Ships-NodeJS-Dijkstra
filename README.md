@@ -30,7 +30,7 @@ Project has two phases. Phase one is a pre-process which combines phaseOne and w
 Phase two contains the cleared data which can be used to find polygons, convert them to edges and create the final graph. You can only use the phaseTwo dataset without running the pre-process code. Project already contains a complete weighted directed graph with many nodes and edges in the Aegean Sea that can be used as an example (data.json) so you can also skip the graph building code. 
 
 You can always use and MongoDB Cluster as a cloud DB and load the datasets there. Make sure to change the URI so the server connects to the correct DB.
-
+Use MongoDB Compass tool if you don't want to edit/configure the database from the terminal and have a nice GUI.
 
 #### Instructions
 
