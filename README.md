@@ -11,10 +11,17 @@ Leaflet
 MongoDB
 NodeJS - Express
 
-## Developing
-
-
+npm install nodejs
+npm install express
+npm install mongoose
+npm install serve-favicon
 
 ### Tools
 VSCode, Eclipse, MongoDB Compass, Postman
 
+#### Instructions
+
+1)Database: Install & activate MongoDB: https://docs.mongodb.com/manual/administration/install-community/
+2)Server: Start server: cd to the proper project directory & run 'node server.js'
+3)Client: Use a broswer or Postman to run the API (http://localhost:3000/home)
+  
