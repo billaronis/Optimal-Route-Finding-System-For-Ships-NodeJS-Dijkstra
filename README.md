@@ -17,7 +17,10 @@ npm install mongoose
 npm install serve-favicon
 
 ### Tools
-VSCode, Eclipse, MongoDB Compass, Postman
+VSCode  
+Eclipse  
+MongoDB Compass  
+Postman
 
 #### Instructions
 
