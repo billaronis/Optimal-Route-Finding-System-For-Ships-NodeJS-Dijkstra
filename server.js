@@ -17,7 +17,6 @@ Ports = require('./models/portSchema');
 Weather_Data = require('./models/weatherDataSchema');
 
 //Connect to the database
-//const uri = "mongodb+srv://Ships:1234abcd@vasilisaronis.s3xvs.mongodb.net/Ships?retryWrites=true&w=majority";
 const uri = "mongodb://localhost:27017/Ships";
 mongoose.connect(uri, {  useNewUrlParser: true,  useUnifiedTopology: true}).then(() => {  console.log("MongoDB Connected…")}).catch(err => console.log(err));
 //mongoose.connect(uri,{ useUnifiedTopology: true});
