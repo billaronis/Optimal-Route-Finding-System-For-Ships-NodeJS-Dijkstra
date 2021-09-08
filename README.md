@@ -24,7 +24,7 @@ Postman
 
 #### Instructions
 
-1)Database: Install & activate MongoDB: https://docs.mongodb.com/manual/administration/install-community/
-2)Server: Start server: cd to the proper project directory & run 'node server.js'
-3)Client: Use a broswer or Postman to run the API (http://localhost:3000/home)
+1)Database: Install & activate MongoDB: https://docs.mongodb.com/manual/administration/install-community/  
+2)Server: Start server: cd to the proper project directory & run 'node server.js'  
+3)Client: Use a broswer or Postman to run the API (http://localhost:3000/home)  
   
